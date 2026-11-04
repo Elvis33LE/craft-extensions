@@ -210,7 +210,7 @@ def validate(page: str) -> list[str]:
         if href.startswith("#"):
             if href[1:] not in p.ids:
                 errors.append("broken anchor: " + href)
-        elif not (ROOT / href).resolve().is_file():
+        elif not href.startswith("https://") and not (ROOT / href).resolve().is_file():
             errors.append("missing local link: " + href)
     if "\u2014" in page or "\u2013" in page:
         errors.append("em or en dash")

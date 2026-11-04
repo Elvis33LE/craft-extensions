@@ -159,7 +159,7 @@ QUESTIONS = [
 
 REFERENCES = [
     ("Design notes (package envelope, storage, trust, launcher screen)", "design-notes.md"),
-    ("Launcher AGENTS.md (layering, golden rules)", "../craft-launcher-src/AGENTS.md"),
-    ("PhotoCraft plug-in contract (ABI v1)", "../photocraft-src/docs/plugins.md"),
-    ("AI layer handoff, the pattern this follows", "../ai-framework-handoff/NEXT.md"),
+    ("Launcher AGENTS.md (layering, golden rules)", "https://github.com/storytold/craft-launcher/blob/main/AGENTS.md"),
+    ("PhotoCraft plug-in contract (ABI v1)", "https://github.com/storytold/photocraft/blob/main/docs/plugins.md"),
+    ("AI layer, the pattern this follows", "https://github.com/storytold/craft-ai-integrations"),
 ]
