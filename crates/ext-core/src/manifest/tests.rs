@@ -46,6 +46,36 @@ fn valid_packages_of_each_kind_parse() {
 }
 
 #[test]
+fn a_plugin_can_ship_a_custom_thumbnail_in_its_package() {
+    let mut v = plugin();
+    v["thumbnail"] = json!("thumbnail.png");
+    v["files"].as_array_mut().unwrap().push(json!({"path": "thumbnail.png", "sha256": HASH, "size": 512}));
+    let m = parse(&v).unwrap();
+    assert_eq!(serde_json::to_value(m).unwrap()["thumbnail"], "thumbnail.png");
+}
+
+#[test]
+fn plugins_reject_unlisted_extra_files_and_invalid_thumbnail_declarations() {
+    let mut v = plugin();
+    v["files"].as_array_mut().unwrap().push(json!({"path": "other.png", "sha256": HASH, "size": 512}));
+    assert_eq!(parse(&v).unwrap_err(), ManifestError::BadThumbnail);
+    v["thumbnail"] = json!("thumbnail.png");
+    assert_eq!(parse(&v).unwrap_err(), ManifestError::BadThumbnail);
+    v["files"][1]["path"] = json!("thumbnail.png");
+    v["files"][1]["size"] = json!(MAX_THUMBNAIL_BYTES + 1);
+    assert_eq!(parse(&v).unwrap_err(), ManifestError::BadThumbnail);
+    v["files"][1]["size"] = json!(0);
+    assert_eq!(parse(&v).unwrap_err(), ManifestError::BadThumbnail);
+    v["files"][1]["size"] = json!(512);
+    assert!(parse(&v).is_ok());
+    v["thumbnail"] = json!("../thumbnail.png");
+    assert!(parse(&v).is_err());
+    let mut theme = theme();
+    theme["thumbnail"] = json!("thumbnail.png");
+    assert_eq!(parse(&theme).unwrap_err(), ManifestError::BadThumbnail);
+}
+
+#[test]
 fn size_is_capped_before_parsing() {
     let big = vec![b' '; MAX_MANIFEST_BYTES + 1];
     assert_eq!(Manifest::parse(&big), Err(ManifestError::TooLarge));

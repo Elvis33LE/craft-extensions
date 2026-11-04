@@ -14,7 +14,7 @@
 use crate::state::{Installed, STATE_FILE, State, StateError};
 use crate::unpack::{Caps, UnpackError, unpack_into};
 use craft_ext_core::id::{AppId, ExtensionId};
-use craft_ext_core::manifest::{Kind, THEME_FILE};
+use craft_ext_core::manifest::{Kind, PLUGIN_THUMBNAIL_FILE, THEME_FILE};
 use craft_ext_core::palette::{ThemeError, ThemeFile};
 use craft_ext_core::tier::{Policy, Tier, TierError};
 use std::fmt;
@@ -31,6 +31,7 @@ pub enum StoreError {
     Unpack(UnpackError),
     Tier(TierError),
     BadTheme(ThemeError),
+    BadThumbnail,
     State(StateError),
     Busy,
     Downgrade,
@@ -49,6 +50,7 @@ impl fmt::Display for StoreError {
             StoreError::Unpack(e) => write!(f, "{e}"),
             StoreError::Tier(e) => write!(f, "{e}"),
             StoreError::BadTheme(e) => write!(f, "{e}"),
+            StoreError::BadThumbnail => f.write_str("the plug-in thumbnail is not a readable PNG of 512 by 512 pixels or smaller"),
             StoreError::State(e) => write!(f, "{e}"),
             StoreError::Busy => f.write_str("another ArtCraft app is changing extensions right now; try again in a moment"),
             StoreError::Downgrade => f.write_str("a newer version of this extension is already installed"),
@@ -85,6 +87,17 @@ fn unique_name() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     format!("{}-{}-{}", std::process::id(), nanos, COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+fn valid_plugin_thumbnail(path: &Path) -> bool {
+    let Ok(bytes) = fs::read(path) else { return false };
+    let mut reader = image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Png);
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(512);
+    limits.max_image_height = Some(512);
+    limits.max_alloc = Some(8 * 1024 * 1024);
+    reader.limits(limits);
+    reader.decode().is_ok()
 }
 
 impl Store {
@@ -161,6 +174,9 @@ impl Store {
     fn install_staged(&self, bytes: &[u8], tier: Tier, staging: &Path) -> Result<Installed, StoreError> {
         let manifest = unpack_into(bytes, staging, self.caps).map_err(StoreError::Unpack)?;
         self.policy.check_id(tier, &manifest.id).map_err(StoreError::Tier)?;
+        if manifest.thumbnail.is_some() && !valid_plugin_thumbnail(&staging.join(PLUGIN_THUMBNAIL_FILE)) {
+            return Err(StoreError::BadThumbnail);
+        }
         if manifest.kind == Kind::Theme {
             let text = fs::read(staging.join(THEME_FILE)).map_err(|_| StoreError::Io)?;
             ThemeFile::parse(&text).map_err(StoreError::BadTheme)?;
@@ -172,6 +188,7 @@ impl Store {
             name: manifest.name.clone(),
             tier,
             apps: manifest.compat.keys().cloned().collect(),
+            thumbnail: manifest.thumbnail.is_some(),
         };
         let destination = self.package_dir(&record.id, record.version);
         let mut old_dir = None;

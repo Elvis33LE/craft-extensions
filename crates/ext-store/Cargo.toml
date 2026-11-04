@@ -16,6 +16,7 @@ craft-ext-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.11.1"
+image = { version = "0.25", default-features = false, features = ["png"] }
 zip = { version = "9.0.4", default-features = false, features = ["deflate"] }
 
 [features]

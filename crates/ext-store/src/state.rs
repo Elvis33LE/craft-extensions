@@ -29,6 +29,9 @@ pub struct Installed {
     pub tier: Tier,
     /// Apps the package says it works with.
     pub apps: Vec<AppId>,
+    /// A publisher-made, validated thumbnail.png exists in this package.
+    #[serde(default)]
+    pub thumbnail: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +141,7 @@ mod tests {
             name: "Tone".into(),
             tier: Tier::FromFile,
             apps: vec![app.clone()],
+            thumbnail: false,
         });
         s.enabled.entry(app.clone()).or_default().insert(id.clone());
         s.active_theme.insert(app.clone(), id.clone());

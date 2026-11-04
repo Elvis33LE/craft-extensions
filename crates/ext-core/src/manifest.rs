@@ -18,6 +18,8 @@ pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 pub const SCHEMA: u32 = 1;
 pub const THEME_FILE: &str = "theme.json";
 pub const PLUGIN_FILE: &str = "plugin.wasm";
+pub const PLUGIN_THUMBNAIL_FILE: &str = "thumbnail.png";
+pub const MAX_THUMBNAIL_BYTES: u64 = 512 * 1024;
 pub const MAX_APPS: usize = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -40,7 +42,7 @@ impl Kind {
     pub fn limits(self) -> Limits {
         match self {
             Kind::Theme => Limits { max_files: 1, max_file: 64 * 1024, max_total: 64 * 1024 },
-            Kind::Plugin => Limits { max_files: 1, max_file: 32 * 1024 * 1024, max_total: 32 * 1024 * 1024 },
+            Kind::Plugin => Limits { max_files: 2, max_file: 32 * 1024 * 1024, max_total: 32 * 1024 * 1024 + MAX_THUMBNAIL_BYTES },
             Kind::Resource => Limits { max_files: 512, max_file: 64 * 1024 * 1024, max_total: 256 * 1024 * 1024 },
         }
     }
@@ -89,6 +91,9 @@ pub struct Manifest {
     pub description: String,
     pub compat: BTreeMap<AppId, Compat>,
     pub files: Vec<FileEntry>,
+    /// Optional publisher-made PNG shown with a plug-in. Its fixed path is listed in `files`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail: Option<String>,
     #[serde(default)]
     pub permissions: Vec<String>,
     #[serde(default)]
@@ -113,6 +118,7 @@ pub enum ManifestError {
     BadHash,
     Files(PathError),
     MissingRequiredFile,
+    BadThumbnail,
     PermissionsNotEmpty,
     BadProvenance,
 }
@@ -136,6 +142,7 @@ impl fmt::Display for ManifestError {
             ManifestError::BadHash => f.write_str("a file's checksum is not valid"),
             ManifestError::Files(e) => write!(f, "{e}"),
             ManifestError::MissingRequiredFile => f.write_str("the package is missing a file it needs"),
+            ManifestError::BadThumbnail => f.write_str("the plug-in thumbnail must be a small thumbnail.png file listed in the package"),
             ManifestError::PermissionsNotEmpty => f.write_str("the package asks for permissions, which are not available yet"),
             ManifestError::BadProvenance => f.write_str("the package's source details are not valid"),
         }
@@ -231,6 +238,17 @@ impl Manifest {
         };
         if required.is_some_and(|name| self.file(name).is_none()) {
             return Err(ManifestError::MissingRequiredFile);
+        }
+        match (self.kind, self.thumbnail.as_deref()) {
+            (Kind::Plugin, Some(PLUGIN_THUMBNAIL_FILE)) => {
+                let picture = self.file(PLUGIN_THUMBNAIL_FILE).ok_or(ManifestError::BadThumbnail)?;
+                if self.files.len() != 2 || picture.size == 0 || picture.size > MAX_THUMBNAIL_BYTES {
+                    return Err(ManifestError::BadThumbnail);
+                }
+            }
+            (Kind::Plugin, None) if self.files.len() == 1 => {}
+            (_, None) if self.kind != Kind::Plugin => {}
+            _ => return Err(ManifestError::BadThumbnail),
         }
         Ok(())
     }

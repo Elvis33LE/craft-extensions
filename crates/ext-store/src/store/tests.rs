@@ -40,6 +40,48 @@ fn staging_is_empty(s: &Store) -> bool {
     fs::read_dir(s.root().join("staging")).map(|mut d| d.next().is_none()).unwrap_or(true)
 }
 
+fn plugin_with_thumbnail(image: &[u8]) -> Vec<u8> {
+    let wasm: &[u8] = b"\0asm\x01\0\0\0";
+    let manifest = serde_json::json!({
+        "schema": 1, "id": "org.example.tone", "name": "Sample plug-in", "version": "1.0.0", "kind": "plugin",
+        "publisher": {"name": "Example"}, "compat": {"photocraft": {"interface": 1}},
+        "thumbnail": "thumbnail.png",
+        "files": [
+            {"path": "plugin.wasm", "sha256": hex(wasm), "size": wasm.len()},
+            {"path": "thumbnail.png", "sha256": hex(image), "size": image.len()}
+        ]
+    })
+    .to_string()
+    .into_bytes();
+    zip_of(&[(craft_ext_core::manifest::MANIFEST_NAME, &manifest), ("plugin.wasm", wasm), ("thumbnail.png", image)])
+}
+
+#[test]
+fn a_publisher_thumbnail_is_preserved_with_the_installed_plugin() {
+    let (_d, s) = store();
+    let picture = include_bytes!("../fixtures/thumbnail.png");
+    let rec = s.install_zip(&plugin_with_thumbnail(picture), Tier::FromFile).unwrap();
+    assert_eq!(fs::read(s.package_dir(&rec.id, rec.version).join("thumbnail.png")).unwrap(), picture);
+    assert_eq!(serde_json::to_value(rec).unwrap()["thumbnail"], true);
+}
+
+#[test]
+fn an_invalid_publisher_thumbnail_is_refused_without_installing_anything() {
+    let (_d, s) = store();
+    let result = s.install_zip(&plugin_with_thumbnail(b"not a PNG"), Tier::FromFile);
+    assert!(result.is_err(), "a file named thumbnail.png is not necessarily an image");
+    assert!(s.state().unwrap().installed.is_empty());
+    assert!(package_folders(&s).is_empty() && staging_is_empty(&s));
+}
+
+#[test]
+fn a_too_wide_thumbnail_is_refused_before_it_changes_the_store() {
+    let (_d, s) = store();
+    let picture = include_bytes!("../fixtures/too-wide.png");
+    assert!(matches!(s.install_zip(&plugin_with_thumbnail(picture), Tier::FromFile), Err(StoreError::BadThumbnail)));
+    assert!(s.state().unwrap().installed.is_empty());
+}
+
 #[test]
 fn installing_a_theme_puts_it_in_place_and_enables_it_for_its_apps() {
     let (_d, s) = store();
