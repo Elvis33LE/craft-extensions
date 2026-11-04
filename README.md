@@ -4,8 +4,7 @@ One place to find, install and switch **themes, plug-ins and resources** for the
 shared by every app and reachable from each of them. The browser itself is native to ArtCraft Launcher;
 this repository holds the shared contract and the on-disk store the launcher and the apps both use.
 
-**Status: provisional and early.** Nothing here has been accepted by the craft-libs maintainers or the
-ArtCraft team, and no app or launcher ships it yet. The API will change.
+**Status: provisional and early.** Nothing here has been accepted by the craft-libs maintainers, and no app or launcher ships it yet. The API will change.
 
 ## Direction
 
