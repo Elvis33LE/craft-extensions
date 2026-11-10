@@ -48,7 +48,7 @@ This is a design. Nothing here is accepted by the maintainers yet, and it does n
 |---|---|
 | Do not restrict what the community builds | The full CLI operation surface is available; native plugins are allowed; listings are never refused for quality or for competing with built-ins |
 | Protect the core | Built-in features, defaults, shortcuts, management and updates cannot be changed by plugins (section 4) |
-| Protect users by design, not by review | Sandbox, permissions, pinned digests and transactions hold even if a check misses something. Native plugins are the stated exception: nothing contains them, so for them protection rests on review (section 9) |
+| Protect users by design, not by review | Sandbox, permissions, pinned digests and transactions hold even if a check misses something. Native plugins are the stated exception: they are protected by review and their full-access label (section 9) |
 | One of everything | One validator, one store, one dispatcher, one manager component, one catalogue |
 | Apps own their data | Documents, transactions, colour pipelines and file formats stay in each app |
 | Proven practice over invention | Patterns used: OpenFX/CLAP, Flathub, TUF, SQLite, the transactional outbox, VS Code bisect, powerbox pickers, npm/pnpm minimum release age |
