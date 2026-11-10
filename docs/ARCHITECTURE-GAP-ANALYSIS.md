@@ -79,7 +79,7 @@ A design question for C13 and section 2: the README promises "`craft-ext-store` 
 
 ## 4. Where the design disagrees with decisions already recorded here
 
-These are written in the README, the threat model or the handover decisions (d3, d11 and others). The new design changes them. **They need an explicit maintainer decision before code follows the design.** Until then, the threat-model gates stay in force.
+These are written in the README, the threat model or the handover decisions (d3, d11 and others). The new design changes them. They needed an explicit maintainer decision before code follows the design; the answers are below. Until the threat model is updated, its gates stay in force.
 
 | # | Recorded here | New design | What has to be decided |
 |---|---|---|---|
@@ -90,11 +90,24 @@ These are written in the README, the threat model or the handover decisions (d3,
 | D5 | Ranking by downloads and other signals (handover d11) | GitHub stars fetched centrally, no download telemetry; official plugins first within a relevance tier | Ranking signal |
 | D6 | PhotoCraft plug-in host first (handover task a-photo-1); existing app ABIs kept | EffectCraft, then FigCraft, then PhotoCraft; every app's current plugin system removed and replaced | Pilot order and removal of existing systems. The PhotoCraft theme adapter on its own branch fits the design's L0 level unchanged |
 
+**Answered in review (2026-11-10).** All six were answered on this pull request and accepted:
+
+| # | Answer |
+|---|---|
+| D1 | The open store is the target. The `third-party` feature stays off until P7. An independent outside security review (G12) stays a gate for public launch (P12). The two-maintainer rule (G10) stays, for native listings and releases only |
+| D2 | Permission families accepted. G6 becomes "declared, host-granted, generation-checked" instead of "empty". Pilots ship transform plugins only until P2 lands |
+| D3 | Native accepted, with a human look (two maintainers) on every native release and never a bot auto-merge. OS confinement is a P10 goal, not a listing requirement |
+| D4 | No store builds. Every listing needs a source link and a pinned asset digest |
+| D5 | GitHub stars fetched centrally, no download telemetry |
+| D6 | EffectCraft, then FigCraft, then PhotoCraft. Each app's old plugin system is removed in the same change set as its new adapter |
+
+The next step is a docs pull request that updates `THREAT-MODEL.md` and the README to these answers.
+
 Consistent with what is recorded here: tiers never self-declared (the design's labels map `FirstParty` → Official, `ReviewedThirdParty` → store listing, `FromFile` → Not reviewed); no silent permission or key change (G7, and the design's "always ask" updates); reserved first-party prefixes (G1); the shared folder (d5); the standalone public workspace (d7); and "plug-ins should support a vast range of ability" (d12).
 
 ## 5. Suggested order of work in this repository
 
-1. **Decide section 4** and update `THREAT-MODEL.md` and the README in one docs pull request.
+1. **Update `THREAT-MODEL.md` and the README** to the section 4 answers in one docs pull request.
 2. **C1, then C2, then C4**. Each is a small store change with a failing-first test. C1 and C2 make the store safe for apps to use, whatever is decided in section 4.
 3. **C5, C6, C8 and C13** together as the "verified installed release" change, plus C3.
 4. **C7** state versioning, before any of the fields above ship to users.

@@ -48,7 +48,7 @@ This is a design. Nothing here is accepted by the maintainers yet, and it does n
 |---|---|
 | Do not restrict what the community builds | The full CLI operation surface is available; native plugins are allowed; listings are never refused for quality or for competing with built-ins |
 | Protect the core | Built-in features, defaults, shortcuts, management and updates cannot be changed by plugins (section 4) |
-| Protect users by design, not by review | Sandbox, permissions, pinned digests and transactions hold even if a check misses something |
+| Protect users by design, not by review | Sandbox, permissions, pinned digests and transactions hold even if a check misses something. Native plugins are the stated exception: nothing contains them, so for them protection rests on review (section 9) |
 | One of everything | One validator, one store, one dispatcher, one manager component, one catalogue |
 | Apps own their data | Documents, transactions, colour pipelines and file formats stay in each app |
 | Proven practice over invention | Patterns used: OpenFX/CLAP, Flathub, TUF, SQLite, the transactional outbox, VS Code bisect, powerbox pickers, npm/pnpm minimum release age |
@@ -276,7 +276,7 @@ The host never panics because of a plugin.
 
 **Native plugins.**
 - Native plugins (helpers, OpenFX- or VST-style hosts) are allowed, in the store too. They run only out of process through a versioned helper protocol, never loaded into the app, so crashes are contained.
-- They are labelled "Native: full access to your computer", with their own consent screen. Updates always ask, and a revocation kills the process.
+- They are labelled "Native: full access to your computer", with their own consent screen. Two maintainers approve every native listing and release; the bot never auto-merges them. Updates always ask, and a revocation kills the process.
 - OS confinement (macOS App Sandbox, Windows AppContainer, Linux Landlock or bubblewrap) is an optional later improvement per platform. Without it, native plugins can do anything the user's account can, so the protected core holds for them only through review.
 
 **Industry-format hosts kept (2026-11-10).** SoundCraft's VST3, CLAP and AU hosting and CADCraft's AutoLISP stay, because users expect these standard formats. They are treated as native full-access plugins: labelled, listed and managed in the shared manager. AutoLISP loses its ability to redefine built-in commands (`defun` over a built-in), so the protected core holds.
@@ -355,7 +355,7 @@ The existing craft-extensions store already provides:
 author: craft-ext prepare-release → GitHub Release on the author's repo (native: one zip per platform)
 author: PR to the catalogue repo adding releases/<version>.toml
 bot (no secrets, read-only): download, digest, validator, licence, source link, namespace, permission diff, smoke test
-merge: bot for routine updates; quick human look for first listing, more permissions, new owner, native
+merge: bot for routine updates; quick human look for first listing, more permissions, new owner; two maintainers for any native release
 publish job: catalogue.json regenerated and signed (TUF); auto-merged updates visible after 48 hours
 apps, launcher, CLI: fetch catalogue (no login) → browse → choose version → download from the author → pinned digest → store
 ```
@@ -685,9 +685,9 @@ The app's old plugin system is removed in the same change set that lands the ada
 | P9 | **PhotoCraft**: the same halftone module unchanged; old filter ABI removed | PhotoCraft | Same output as EffectCraft |
 | P10 | Native helper protocol and full-access label | craft-ext-host, EffectCraft | Native crash contained; revocation kills process |
 | P11 | Other apps by demand (FilmCraft next); themes revisit | Each app | Per-app proofs |
-| P12 | Public launch: catalogue domain live, keys held, listing rules and disclaimer, author guide, templates, internal security review of the platform | All | Maintainers decide community enablement |
+| P12 | Public launch: catalogue domain live, keys held, listing rules and disclaimer, author guide, templates, independent outside security review of the platform | All | Maintainers decide community enablement |
 
-P1, P2 and P3 can run in parallel. P5b and P7 run alongside P6–P9. A maintainer merge hold on plugin-system changes lifts area by area as units land; EffectCraft's plugin areas lift at P6.
+Until P2 lands, pilots ship transform plugins only. The `third-party` cargo feature stays off until P7. P1, P2 and P3 can run in parallel. P5b and P7 run alongside P6–P9. A maintainer merge hold on plugin-system changes lifts area by area as units land; EffectCraft's plugin areas lift at P6.
 
 ## 23. Policy and maintenance
 
@@ -699,7 +699,8 @@ P1, P2 and P3 can run in parallel. P5b and P7 run alongside P6–P9. A maintaine
 | Official plugins | Same catalogue, rules and licences; flag set by maintainers only |
 | Paid or private distribution | Not a store goal; no credential or entitlement integration |
 | Disclaimer and takedowns | Short disclaimer in the catalogue README and manager; takedowns case by case under the listing rules |
-| Security review | Internal review of the platform by maintainers before public launch; no external review planned |
+| Security review | Independent outside security review of the platform (sandbox host, store client, catalogue signing, attach transport) before public launch (P12) |
+| Native review | Two maintainers approve every native listing and every native release; the bot never auto-merges native |
 | Contract support | A contract major stays supported for **12 months** after its successor ships. It can end earlier only for published security reasons. Authors get warnings from `check`; users are warned only in the final months |
 | Contract changes | PR in craft-extensions; shared domain contracts need approval from maintainers of at least two consuming apps |
 | Ownership | Platform maintainers (craft-extensions); each app's maintainers (adapter and contract); catalogue maintainers (repository, bot, keys, incidents). Names to be assigned |
@@ -710,7 +711,7 @@ P1, P2 and P3 can run in parallel. P5b and P7 run alongside P6–P9. A maintaine
 
 | Item | Owner | When |
 |---|---|---|
-| Name owners for every part; create and name the catalogue repository; assign key holders | Maintainers and bosses | P0 / P7 |
+| Name owners for every part; create and name the catalogue repository; assign key holders | Maintainers | P0 / P7 |
 | wasmi 2 accepted WebAssembly features for the SDK template | Platform | P3–P4 |
 | A maintained TUF Rust client and its licence | Platform | P7 |
 | Budget numbers from benchmarks | Platform | P3, P12 |
