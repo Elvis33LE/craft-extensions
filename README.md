@@ -6,6 +6,8 @@ this repository holds the shared contract and the on-disk store the launcher and
 
 **Status: provisional and early.** Nothing here has been accepted by the craft-libs maintainers, and no app or launcher ships it yet. The API will change.
 
+A proposed architecture for the full plugin and add-on system is under review: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), with its [decision record](docs/DESIGN-DECISIONS.md), the [topic proposals](docs/TOPIC-PROPOSALS.md) behind it and a [gap analysis](docs/ARCHITECTURE-GAP-ANALYSIS.md) against the code here. Until the maintainers accept it, the direction below and [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) still apply.
+
 ## Direction
 
 - **Internal first.** Release builds install extensions built by the Craft organisation, plus files a
