@@ -1,6 +1,6 @@
 # Craft plugin architecture
 
-Status: **proposal for review, 2026-11-10.** This describes the plugin and add-on system for the Craft apps that this repository would host. It was settled in a series of design sessions; each choice and its wording is in [DESIGN-DECISIONS.md](DESIGN-DECISIONS.md). How it compares with the code on `main` today, and where it disagrees with [THREAT-MODEL.md](THREAT-MODEL.md) and the earlier handover decisions, is in [ARCHITECTURE-GAP-ANALYSIS.md](ARCHITECTURE-GAP-ANALYSIS.md).
+Status: **proposal for review, 2026-11-10.** This describes the plugin and add-on system for the Craft apps that this repository would host. It was settled in a series of design sessions; each choice and its wording is in [DESIGN-DECISIONS.md](DESIGN-DECISIONS.md), and each topic's reasoning, evidence and rejected alternatives are in [TOPIC-PROPOSALS.md](TOPIC-PROPOSALS.md). How it compares with the code on `main` today, and where it disagrees with [THREAT-MODEL.md](THREAT-MODEL.md) and the earlier handover decisions, is in [ARCHITECTURE-GAP-ANALYSIS.md](ARCHITECTURE-GAP-ANALYSIS.md).
 
 This is a design. Nothing here is accepted by the maintainers yet, and it does not authorize implementation, new repositories, publication or releases. Each delivery unit (section 22) needs its own approval and pull request.
 
@@ -741,5 +741,6 @@ P1, P2 and P3 can run in parallel. P5b and P7 run alongside P6–P9. A maintaine
 ## Where the detail lives
 
 - Every decision with its date and wording: [DESIGN-DECISIONS.md](DESIGN-DECISIONS.md)
+- Each topic's proposal, with evidence and rejected alternatives: [TOPIC-PROPOSALS.md](TOPIC-PROPOSALS.md)
 - Comparison with this repository's code and threat model: [ARCHITECTURE-GAP-ANALYSIS.md](ARCHITECTURE-GAP-ANALYSIS.md)
 - Current security gates: [THREAT-MODEL.md](THREAT-MODEL.md)
