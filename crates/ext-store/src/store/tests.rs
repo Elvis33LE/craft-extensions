@@ -86,6 +86,24 @@ fn a_newer_version_replaces_the_old_one_and_downgrades_are_refused() {
 }
 
 #[test]
+fn an_update_keeps_enablement_for_surviving_apps_and_clears_dropped_ones() {
+    let (_d, s) = store();
+    let rec = s.install_zip(&theme_package("org.example.ocean", "1.0.0", &["photocraft", "launcher"], &dark_theme()), Tier::FromFile).unwrap();
+    let pc = app("photocraft");
+    let lc = app("launcher");
+    s.set_enabled(&pc, &rec.id, true).unwrap();
+    s.set_active_theme(&pc, Some(&rec.id)).unwrap();
+    s.set_enabled(&lc, &rec.id, true).unwrap();
+    s.install_zip(&theme_package("org.example.ocean", "1.1.0", &["photocraft"], &dark_theme()), Tier::FromFile).unwrap();
+    let state = s.state().unwrap();
+    assert!(state.is_enabled(&pc, &rec.id), "an app the new version still supports keeps its choice");
+    assert_eq!(state.active_theme.get(&pc), Some(&rec.id), "its theme choice survives too");
+    assert!(!state.is_enabled(&lc, &rec.id), "an app the new version dropped is switched off");
+    assert!(!state.active_theme.contains_key(&lc), "its theme choice is gone too");
+    assert_eq!(state.installed[0].apps, vec![pc.clone()]);
+}
+
+#[test]
 fn a_file_cannot_replace_a_first_party_extension_or_use_its_names() {
     let (_d, s) = store();
     s.install_zip(&theme("org.example.official", "1.0.0"), Tier::FirstParty).unwrap();
