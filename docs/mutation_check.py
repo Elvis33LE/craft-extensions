@@ -86,6 +86,8 @@ STORE = [
     ("state: newer read version accepted", "state.rs", "if read_version > KNOWN_READ_VERSION {", "if false {"),
     ("state: size cap off", "state.rs", "if bytes.len() as u64 > MAX_STATE_BYTES {", "if false {"),
     ("state: newer write version accepted", "store.rs", "if state.write_version > KNOWN_WRITE_VERSION {", "if false {"),
+    ("store: release deleted while leased", "store.rs", "&& !lease::held(&self.root, &record.id, old_version)", "&& lease::held(&self.root, &record.id, old_version)"),
+    ("store: uninstall deleted while leased", "store.rs", "if !lease::held(&self.root, id, version) {", "if lease::held(&self.root, id, version) {"),
 ]
 
 # Survivors that cannot be killed, with the reason. Anything else that survives fails the run.
