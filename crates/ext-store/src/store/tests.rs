@@ -61,8 +61,8 @@ fn installing_a_theme_puts_it_in_place_and_enables_nothing() {
     let (_d, s) = store();
     let rec = s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
     assert_eq!((rec.id.as_str(), rec.version, rec.kind, rec.tier), ("org.example.ocean", Version::new(1, 0, 0), Kind::Theme, Tier::FromFile));
-    assert_eq!(package_folders(&s), vec!["org.example.ocean/1.0.0"]);
-    assert!(s.package_dir(&rec.id, rec.version).join("theme.json").is_file());
+    assert_eq!(package_folders(&s), vec![format!("org.example.ocean/1.0.0-{}", rec.sha256)]);
+    assert!(crate::layout::installed_dir(s.root(), &rec).join("theme.json").is_file());
     let state = s.state().unwrap();
     assert_eq!(state.generation, 1);
     assert!(state.enabled.is_empty(), "install enables nothing; each app turns the package on itself");
@@ -75,13 +75,14 @@ fn a_newer_version_replaces_the_old_one_and_downgrades_are_refused() {
     let (_d, s) = store();
     s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
     s.install_zip(&theme("org.example.ocean", "1.1.0"), Tier::FromFile).unwrap();
-    assert_eq!(package_folders(&s), vec!["org.example.ocean/1.1.0"], "the old version's files are gone");
+    let latest = s.state().unwrap().installed[0].clone();
+    assert_eq!(package_folders(&s), vec![format!("org.example.ocean/1.1.0-{}", latest.sha256)], "the old version's files are gone");
     assert_eq!(s.state().unwrap().installed.len(), 1);
     assert_eq!(s.state().unwrap().generation, 2);
     assert_eq!(s.install_zip(&theme("org.example.ocean", "1.0.5"), Tier::FromFile), Err(StoreError::Downgrade));
-    assert_eq!(s.install_zip(&theme("org.example.ocean", "1.1.0"), Tier::FromFile), Err(StoreError::AlreadyInstalled));
+    assert_eq!(s.install_zip(&theme("org.example.ocean", "1.1.0"), Tier::FromFile).unwrap(), latest);
     assert_eq!(s.state().unwrap().generation, 2, "refused installs change nothing");
-    assert_eq!(package_folders(&s), vec!["org.example.ocean/1.1.0"]);
+    assert_eq!(package_folders(&s), vec![format!("org.example.ocean/1.1.0-{}", latest.sha256)]);
     assert!(staging_is_empty(&s));
 }
 
@@ -125,6 +126,8 @@ fn a_file_cannot_replace_an_extension_installed_from_the_store() {
         name: "Ocean".into(),
         tier: Tier::ReviewedThirdParty,
         apps: vec![app("photocraft")],
+        sha256: String::new(),
+        manifest: None,
     };
     fs::create_dir_all(s.root()).unwrap();
     let mut state = State::default();
@@ -172,17 +175,18 @@ fn a_plugin_installs_with_its_interface_and_is_left_disabled() {
     let (_d, s) = store();
     let rec = s.install_zip(&plugin_package("org.example.tone", "1.0.0"), Tier::FromFile).unwrap();
     assert_eq!(rec.kind, Kind::Plugin);
-    assert!(s.package_dir(&rec.id, rec.version).join("plugin.wasm").is_file());
+    assert!(crate::layout::installed_dir(s.root(), &rec).join("plugin.wasm").is_file());
     assert!(!s.state().unwrap().is_enabled(&app("photocraft"), &rec.id), "the app turns the plug-in on itself");
 }
 
 #[test]
 fn an_existing_package_folder_is_never_overwritten() {
     let (_d, s) = store();
-    let dir = s.package_dir(&id("org.example.ocean"), Version::new(1, 0, 0));
+    let bytes = theme("org.example.ocean", "1.0.0");
+    let dir = crate::layout::release_dir(s.root(), &id("org.example.ocean"), Version::new(1, 0, 0), &hex(&bytes));
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("precious"), b"keep").unwrap();
-    assert_eq!(s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile), Err(StoreError::Io));
+    assert_eq!(s.install_zip(&bytes, Tier::FromFile), Err(StoreError::Io));
     assert_eq!(fs::read(dir.join("precious")).unwrap(), b"keep");
     assert!(staging_is_empty(&s));
     assert_eq!(s.state().unwrap().generation, 0);
@@ -191,9 +195,10 @@ fn an_existing_package_folder_is_never_overwritten() {
 #[test]
 fn an_existing_empty_package_folder_is_not_replaced_either() {
     let (_d, s) = store();
-    let dir = s.package_dir(&id("org.example.ocean"), Version::new(1, 0, 0));
+    let bytes = theme("org.example.ocean", "1.0.0");
+    let dir = crate::layout::release_dir(s.root(), &id("org.example.ocean"), Version::new(1, 0, 0), &hex(&bytes));
     fs::create_dir_all(&dir).unwrap();
-    assert_eq!(s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile), Err(StoreError::Io));
+    assert_eq!(s.install_zip(&bytes, Tier::FromFile), Err(StoreError::Io));
     assert!(fs::read_dir(&dir).unwrap().next().is_none());
     assert_eq!(s.state().unwrap().generation, 0);
 }
@@ -221,12 +226,13 @@ fn a_leased_release_survives_an_update_until_it_is_released() {
     let rec = s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
     let _guard = s.acquire_lease(&rec.id, rec.version).unwrap();
     s.install_zip(&theme("org.example.ocean", "1.1.0"), Tier::FromFile).unwrap();
-    let old = s.package_dir(&rec.id, Version::new(1, 0, 0));
+    let old = crate::layout::installed_dir(s.root(), &rec);
     assert!(old.is_dir(), "the leased release stays on disk");
     assert!(old.join("theme.json").is_file(), "a reader can still use it");
     drop(_guard);
     s.cleanup().unwrap();
-    assert_eq!(package_folders(&s), vec!["org.example.ocean/1.1.0"], "cleanup removes the released old version");
+    let current = s.state().unwrap().installed[0].clone();
+    assert_eq!(package_folders(&s), vec![format!("org.example.ocean/1.1.0-{}", current.sha256)], "cleanup removes the released old version");
 }
 
 #[test]
@@ -235,7 +241,7 @@ fn an_uninstall_leaves_a_leased_release_for_cleanup() {
     let rec = s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
     let _guard = s.acquire_lease(&rec.id, rec.version).unwrap();
     s.uninstall(&rec.id).unwrap();
-    assert!(s.package_dir(&rec.id, Version::new(1, 0, 0)).is_dir(), "the leased release stays on disk");
+    assert!(crate::layout::installed_dir(s.root(), &rec).is_dir(), "the leased release stays on disk");
     drop(_guard);
     s.cleanup().unwrap();
     assert!(package_folders(&s).is_empty(), "cleanup removes it once the lease is gone");
@@ -318,9 +324,9 @@ fn a_state_written_by_a_newer_app_blocks_changes_and_is_left_untouched() {
     let (_d, s) = store();
     fs::create_dir_all(s.root()).unwrap();
     let path = s.root().join(STATE_FILE);
-    fs::write(&path, br#"{"schema":1,"generation":7,"read_version":1,"write_version":2,"installed":[]}"#).unwrap();
-    assert_eq!(s.uninstall(&id("org.example.ocean")), Err(StoreError::State(StateError::Newer(2))));
-    assert_eq!(fs::read(&path).unwrap(), br#"{"schema":1,"generation":7,"read_version":1,"write_version":2,"installed":[]}"#);
+    fs::write(&path, br#"{"schema":1,"generation":7,"read_version":1,"write_version":3,"installed":[]}"#).unwrap();
+    assert_eq!(s.uninstall(&id("org.example.ocean")), Err(StoreError::State(StateError::Newer(3))));
+    assert_eq!(fs::read(&path).unwrap(), br#"{"schema":1,"generation":7,"read_version":1,"write_version":3,"installed":[]}"#);
 }
 
 #[test]
@@ -334,6 +340,91 @@ fn install_file_reads_a_file_and_refuses_a_giant_one() {
     let mut small = Store::at(d.path().join("ext2"));
     small.caps.max_archive = 10;
     assert_eq!(small.install_file(&path, Tier::FromFile), Err(StoreError::Unpack(UnpackError::TooBig)));
+}
+
+#[test]
+fn release_metadata_and_reinstall_are_stable() {
+    let (_d, s) = store();
+    let bytes = theme("org.example.ocean", "1.0.0");
+    let rec = s.install_zip(&bytes, Tier::FromFile).unwrap();
+    assert!(crate::layout::release_dir(s.root(), &rec.id, rec.version, &rec.sha256).is_dir());
+    assert_eq!(s.install_zip(&bytes, Tier::FromFile).unwrap(), rec);
+    assert_eq!(s.state().unwrap().installed.len(), 1);
+    let text = fs::read_to_string(s.root().join(STATE_FILE)).unwrap();
+    assert!(text.contains(&rec.sha256));
+    assert!(s.state().unwrap().installed[0].manifest.is_some());
+    assert_eq!(s.state().unwrap().write_version, 2, "new saves are tagged for newer writers");
+}
+
+#[test]
+fn a_different_archive_at_the_same_version_is_refused() {
+    let (_d, s) = store();
+    s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
+    let mut changed = dark_theme();
+    changed.push(b' ');
+    let different = theme_package("org.example.ocean", "1.0.0", &["photocraft", "launcher"], &changed);
+    assert_eq!(s.install_zip(&different, Tier::FromFile), Err(StoreError::AlreadyInstalled));
+}
+
+#[test]
+fn an_explicit_version_must_match_the_package() {
+    let (_d, s) = store();
+    let bytes = theme("org.example.ocean", "1.0.0");
+    assert_eq!(s.install_version(&bytes, Tier::FromFile, Version::new(2, 0, 0)), Err(StoreError::VersionMismatch));
+}
+
+#[test]
+fn explicit_version_allows_downgrade_and_revocations_block_use() {
+    let (_d, s) = store();
+    let old = theme("org.example.ocean", "1.0.0");
+    let newer = theme("org.example.ocean", "2.0.0");
+    s.install_zip(&newer, Tier::FromFile).unwrap();
+    assert_eq!(s.install_zip(&old, Tier::FromFile), Err(StoreError::Downgrade));
+    let record = s.install_version(&old, Tier::FromFile, Version::new(1, 0, 0)).unwrap();
+    s.set_enabled(&app("photocraft"), &record.id, true).unwrap();
+    s.set_revocations(vec![Revocation { id: record.id.clone(), below: Some(Version::new(2, 0, 0)), sha256: None }]).unwrap();
+    assert_eq!(s.set_enabled(&app("photocraft"), &record.id, true), Err(StoreError::Revoked));
+    assert!(Reader::open(s.root()).installed_for(&app("photocraft"), Kind::Theme).is_empty());
+}
+
+#[test]
+fn revoked_archive_digest_is_blocked_for_file_installs() {
+    let (_d, s) = store();
+    let bytes = theme("org.example.ocean", "1.0.0");
+    use sha2::{Digest, Sha256};
+    let sha256 = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect();
+    s.set_revocations(vec![Revocation { id: id("org.example.ocean"), below: None, sha256: Some(sha256) }]).unwrap();
+    assert_eq!(s.install_zip(&bytes, Tier::FromFile), Err(StoreError::Revoked));
+}
+
+#[test]
+fn a_revoked_digest_also_blocks_an_idempotent_reinstall() {
+    let (_d, s) = store();
+    let bytes = theme("org.example.ocean", "1.0.0");
+    let rec = s.install_zip(&bytes, Tier::FromFile).unwrap();
+    s.set_revocations(vec![Revocation { id: rec.id.clone(), below: None, sha256: Some(rec.sha256.clone()) }]).unwrap();
+    assert_eq!(s.install_zip(&bytes, Tier::FromFile), Err(StoreError::Revoked));
+}
+
+#[test]
+fn legacy_folder_remains_a_reader_fallback_and_cleanup_keeps_digest_release() {
+    let (_d, s) = store();
+    let rec = s.install_zip(&theme("org.example.ocean", "1.0.0"), Tier::FromFile).unwrap();
+    s.cleanup().unwrap();
+    assert!(crate::layout::installed_dir(s.root(), &rec).is_dir());
+    let legacy = s.package_dir(&id("org.example.legacy"), Version::new(1, 0, 0));
+    fs::create_dir_all(&legacy).unwrap();
+    fs::write(legacy.join("theme.json"), dark_theme()).unwrap();
+    let mut state = s.state().unwrap();
+    let mut old = rec.clone();
+    old.id = id("org.example.legacy");
+    old.sha256.clear();
+    old.manifest = None;
+    state.installed.push(old.clone());
+    state.enabled.entry(app("photocraft")).or_default().insert(old.id.clone());
+    state.enabled.entry(app("photocraft")).or_default().insert(rec.id.clone());
+    fs::write(s.root().join(STATE_FILE), serde_json::to_vec(&state).unwrap()).unwrap();
+    assert_eq!(Reader::open(s.root()).installed_for(&app("photocraft"), Kind::Theme).len(), 2);
 }
 
 #[test]

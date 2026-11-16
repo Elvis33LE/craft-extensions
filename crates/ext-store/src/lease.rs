@@ -5,6 +5,7 @@
 //! never keeps a release on disk forever: the next `is_leased` or `cleanup` sweep sees the unlocked
 //! file as dead and removes it.
 
+use crate::layout;
 use crate::state::Installed;
 use crate::store::{StoreError, unique_name};
 use craft_ext_core::id::ExtensionId;
@@ -119,7 +120,10 @@ pub(crate) fn cleanup(root: &Path, installed: &[Installed]) -> Result<(), StoreE
     if let Ok(packages) = fs::read_dir(root.join("packages")) {
         for package in packages.flatten() {
             let id_name = package.file_name().to_string_lossy().into_owned();
-            let installed_version = installed.iter().find(|i| i.id.as_str() == id_name).map(|i| i.version.to_string());
+            let installed_version = installed
+                .iter()
+                .find(|i| i.id.as_str() == id_name)
+                .and_then(|i| layout::installed_dir(root, i).file_name().map(|n| n.to_string_lossy().into_owned()));
             if let Ok(vers) = fs::read_dir(package.path()) {
                 for ver_dir in vers.flatten() {
                     let ver_name = ver_dir.file_name().to_string_lossy().into_owned();

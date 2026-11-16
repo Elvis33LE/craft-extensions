@@ -5,7 +5,7 @@
 //! the store bumps `generation`, which running apps watch to notice an install without any other signal.
 
 use craft_ext_core::id::{AppId, ExtensionId};
-use craft_ext_core::manifest::Kind;
+use craft_ext_core::manifest::{Kind, Manifest};
 use craft_ext_core::tier::Tier;
 use craft_ext_core::version::Version;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,8 @@ pub const SCHEMA: u32 = 1;
 /// The highest state format this build fully understands. Files declaring more are refused.
 pub const KNOWN_READ_VERSION: u32 = 1;
 /// The highest state format this build can save without dropping another app's fields.
-pub const KNOWN_WRITE_VERSION: u32 = 1;
+pub const KNOWN_WRITE_VERSION: u32 = 2;
+pub const WRITE_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Installed {
@@ -33,6 +34,19 @@ pub struct Installed {
     pub tier: Tier,
     /// Apps the package says it works with.
     pub apps: Vec<AppId>,
+    #[serde(default)]
+    pub sha256: String,
+    #[serde(default)]
+    pub manifest: Option<Manifest>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Revocation {
+    pub id: ExtensionId,
+    #[serde(default)]
+    pub below: Option<Version>,
+    #[serde(default)]
+    pub sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +66,8 @@ pub struct State {
     pub enabled: BTreeMap<AppId, BTreeSet<ExtensionId>>,
     #[serde(default)]
     pub active_theme: BTreeMap<AppId, ExtensionId>,
+    #[serde(default)]
+    pub revocations: Vec<Revocation>,
 }
 
 impl Default for State {
@@ -59,11 +75,12 @@ impl Default for State {
         Self {
             schema: SCHEMA,
             read_version: SCHEMA,
-            write_version: SCHEMA,
+            write_version: WRITE_VERSION,
             generation: 0,
             installed: Vec::new(),
             enabled: BTreeMap::new(),
             active_theme: BTreeMap::new(),
+            revocations: Vec::new(),
         }
     }
 }
@@ -133,6 +150,15 @@ impl State {
     pub fn is_enabled(&self, app: &AppId, id: &ExtensionId) -> bool {
         self.enabled.get(app).is_some_and(|set| set.contains(id))
     }
+
+    pub fn is_revoked(&self, i: &Installed) -> bool {
+        self.revocations.iter().any(|r| {
+            r.id == i.id
+                && ((r.below.is_none() && r.sha256.is_none())
+                    || r.below.is_some_and(|below| i.version < below)
+                    || r.sha256.as_ref().is_some_and(|hash| hash.eq_ignore_ascii_case(&i.sha256)))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -164,6 +190,8 @@ mod tests {
             name: "Tone".into(),
             tier: Tier::FromFile,
             apps: vec![app.clone()],
+            sha256: String::new(),
+            manifest: None,
         });
         s.enabled.entry(app.clone()).or_default().insert(id.clone());
         s.active_theme.insert(app.clone(), id.clone());
