@@ -64,6 +64,7 @@ STORE = [
     ("store: reserved names unchecked", "store.rs", "self.policy.check_id(tier, &manifest.id).map_err(StoreError::Tier)?;", "let _ = self.policy.check_id(tier, &manifest.id);"),
     ("store: theme unchecked", "store.rs", "ThemeFile::parse(&text).map_err(StoreError::BadTheme)?;", "let _ = ThemeFile::parse(&text);"),
     ("store: first-party replaced by a file", "store.rs", "if existing.tier == Tier::FirstParty && tier != Tier::FirstParty {", "if false {"),
+    ("store: a file replaces a store-installed extension", "store.rs", "if tier == Tier::FromFile && existing.tier != Tier::FromFile {", "if false {"),
     ("store: downgrade allowed", "store.rs", "if record.version < existing.version {", "if false {"),
     ("store: same version allowed", "store.rs", "if record.version == existing.version {", "if false {"),
     ("store: install enables every listed app", "store.rs", "state.installed.push(record.clone());", "state.installed.push(record.clone());\n            for app in &record.apps {\n                state.enabled.entry(app.clone()).or_default().insert(record.id.clone());\n            }"),
